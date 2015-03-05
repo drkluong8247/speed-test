@@ -17,9 +17,9 @@ window.onload = function() {
     
     function preload() {
         // Loads images
-        game.load.image( 'world', 'assets/SkyRoadBackground.png' );
-        game.load.image( 'ambulance', 'assets/Ambulance.png');
-        game.load.image( 'traffic', 'assets/Car.png');
+        game.load.image( 'world', 'assets/RoadBackground.png' );
+        game.load.image( 'player', 'assets/SportsCar.png');
+        game.load.image( 'wall', 'assets/Barrier.png');
         
         // loads sound
         game.load.audio( 'backgroundMusic', 'assets/BedoBedo.ogg');
@@ -67,7 +67,7 @@ window.onload = function() {
         
         // creates background, player, and monsters
         world = game.add.tileSprite(0, 0, 800, 600, 'world');
-        player = game.add.sprite( game.world.centerX, game.world.centerY, 'ambulance' );
+        player = game.add.sprite( game.world.centerX, game.world.centerY, 'player' );
         
         
         // Create a sprite at the center of the screen using the 'logo' image.
@@ -85,7 +85,7 @@ window.onload = function() {
         enemies = game.add.group();
         enemies.enableBody = true;
         enemies.physicsBodyType = Phaser.Physics.ARCADE;
-        enemies.createMultiple(10, 'traffic', 0, false);
+        enemies.createMultiple(10, 'wall', 0, false);
         enemies.setAll('anchor.x', 0.5);
         enemies.setAll('anchor.y', 0.5);
         enemies.setAll('outOfBoundsKill', true);
