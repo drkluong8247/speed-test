@@ -17,12 +17,13 @@ window.onload = function() {
     
     function preload() {
         // Loads images
-        game.load.image( 'world', 'assets/SkyRoadBackground.png' );
-        game.load.image( 'ambulance', 'assets/Ambulance.png');
-        game.load.image( 'traffic', 'assets/Car.png');
+        game.load.image( 'world', 'assets/RoadBackground.png' );
+        game.load.image( 'player', 'assets/SportsCar.png');
+        game.load.image( 'wall', 'assets/Barrier.png');
+        game.load.image( 'alert', 'assets/sign.png');
         
         // loads sound
-        game.load.audio( 'backgroundMusic', 'assets/BedoBedo.ogg');
+        game.load.audio( 'backgroundMusic', 'assets/AnimalCrossing-TownHall.ogg');
     }
     
     //background image
@@ -30,6 +31,10 @@ window.onload = function() {
     
     //player sprite
     var player;
+    
+    //warnings
+    var warnings;
+    var warningTimer;
     
     //enemy sprites and enemy generation
     var enemies;
@@ -47,17 +52,22 @@ window.onload = function() {
     //player movement
     var playerVelocity;
     
+    //player's current gear setting
+    var lowgear;
+    var gearText;
+    var gearReady;
+    
     //player's current score
     var score;
     
-    //game over message (and player death)
-    var lives;
+    //game over message
     var lost;
     var style;
     var isAlive;
     
     //player input
     var cursors;
+    var shiftGear;
     
     //sounds
     var music;
@@ -67,7 +77,7 @@ window.onload = function() {
         
         // creates background, player, and monsters
         world = game.add.tileSprite(0, 0, 800, 600, 'world');
-        player = game.add.sprite( game.world.centerX, game.world.centerY, 'ambulance' );
+        player = game.add.sprite( game.world.centerX, game.world.centerY, 'player' );
         
         
         // Create a sprite at the center of the screen using the 'logo' image.
@@ -81,11 +91,21 @@ window.onload = function() {
         player.body.collideWorldBounds = true;
         
         
-        // adds traffic
+        // adds warnings
+        warnings = game.add.group();
+        warnings.enableBody = true;
+        warnings.physicsBodyType = Phaser.Physics.ARCADE;
+        warnings.createMultiple(20, 'alert', 0, false);
+        warnings.setAll('anchor.x', 0.5);
+        warnings.setAll('anchor.y', 0.5);
+        warnings.setAll('outOfBoundsKill', true);
+        warnings.setAll('checkWorldBounds', true);
+        
+        // adds barriers
         enemies = game.add.group();
         enemies.enableBody = true;
         enemies.physicsBodyType = Phaser.Physics.ARCADE;
-        enemies.createMultiple(10, 'traffic', 0, false);
+        enemies.createMultiple(20, 'wall', 0, false);
         enemies.setAll('anchor.x', 0.5);
         enemies.setAll('anchor.y', 0.5);
         enemies.setAll('outOfBoundsKill', true);
@@ -93,19 +113,19 @@ window.onload = function() {
         
         // Player controls
         cursors = game.input.keyboard.createCursorKeys();
+        shiftGear = game.input.keyboard.addKey(Phaser.Keyboard.Z);
         
         // Adds sound
         music = game.add.audio('backgroundMusic', 1, true);
         music.play('', 0, 1, true);
         
         //initializes timer
-        timer = game.time.now+120000;
+        timer = game.time.now+180000;
         timerStyle = { font: "40px Arial", fill: "#000000", align: "center" }
-        timerText = game.add.text(game.world.centerX, 30, "2:00", timerStyle);
+        timerText = game.add.text(game.world.centerX, 30, "3:00", timerStyle);
         timerText.anchor.setTo(0.5, 0.5);
         
-        //initializes score and player's lives
-        lives = 3;
+        //initializes score
         score = 0;
         isAlive = true;
         
@@ -114,6 +134,9 @@ window.onload = function() {
         
         //initializes player speed
         playerVelocity = 0;
+        lowgear = true;
+        gearText = "LOW";
+        gearReady = game.time.now;
     }
     
     function update() {
@@ -127,8 +150,18 @@ window.onload = function() {
         }
         else if (cursors.right.isDown)
         {
-            playerVelocity += 30;
-            if(playerVelocity > 600) playerVelocity = 600;
+            //checks player's gear setting
+            //LOW = high acceleration, capped speed
+            //HIGH = slow acceleration, no capped speed
+            if(lowgear)
+            {
+                playerVelocity += 20;
+                if(playerVelocity > 1800) playerVelocity = 1800;
+            }
+            else
+            {
+                playerVelocity += 2;
+            }
         }
         else
         {
@@ -138,19 +171,35 @@ window.onload = function() {
             
         if (cursors.up.isDown)
         {
-            player.body.velocity.y = -150;
+            player.body.velocity.y = -200;
         }
         else if (cursors.down.isDown)
         {
-            player.body.velocity.y = 150;
+            player.body.velocity.y = 200;
         }
         
-        //creates enemies (flying traffic ugh)
+        // controls switching gears
+        if(shiftGear.downDuration(50) && game.time.now > gearReady)
+        {
+            lowgear = !lowgear;
+            if(lowgear)
+            {
+                gearText = "LOW";
+            }
+            else
+            {
+                gearText = "HIGH";
+            }
+            gearReady = game.time.now + 500;
+        }
+        
+        //creates enemies (police speed traps woot)
         createEnemy();
         
-        //now to check enemies
+        //now to check enemies (and warnings)
         game.physics.arcade.overlap(enemies, player, monsterHandler, null, this);
         enemies.forEachAlive(updateEnemies, this);
+        warnings.forEachAlive(updateWarnings, this);
         
         //updates timer
         if(timerActive)
@@ -165,72 +214,66 @@ window.onload = function() {
 
             if((timeLeft <= 0) && isAlive)
             {
-                defeat();
+                timeUp();
             }
         }
         
         //updates score
         if(isAlive)
-            score += playerVelocity;
-        if(score >= 2500000)
-            victory();
+            score += parseInt(playerVelocity/10);
     }
     
     function createEnemy() {
         if (game.time.now > nextEnemy && enemies.countDead() > 0)
         {
+            var indicator = (game.rnd.integer() % 5 + 1);
+            
             nextEnemy = game.time.now + enemyTimer;
-
             var enemy = enemies.getFirstExists(false);
-
-            enemy.reset(850, (game.rnd.integer() % 5 + 1) * 100);
-
+            enemy.reset(2000, indicator * 100);
             enemy.body.velocity.x = 200 - playerVelocity;
             
-            if(score > 1000000)
+            var warning = warnings.getFirstExists(false);
+            warning.reset(750, indicator * 100);
+            warningTimer = game.time.now + enemyTimer/2;
+            warning.body.velocity.x = 0;
+            
+            
+            if(score > 500000)
                 enemyTimer = 800;
-            if(score > 2000000)
-                enemyTimer = 500;
         }
     }
     
     function updateEnemies(enemy)
     {
-        enemy.body.velocity.x = 200 - playerVelocity;
+        enemy.body.velocity.x =  -playerVelocity;
+    }
+    
+    function updateWarnings(warning)
+    {
+        if(game.time.now > warningTimer)
+            warning.kill();
     }
     
     function monsterHandler(player, enemy)
     {
         enemy.kill();
-        lives -= 1;
-        if(lives <= 0)
-        {
-            defeat();
-        }   
+        playerVelocity /= 10;
     }
     
-    //if player wins
-    function victory()
+    //game ends
+    function timeUp()
     {
         player.kill();
         isAlive = false;
         timerActive = false;
-        lost = game.add.text(game.world.centerX, game.world.centerY, "You made it!", style);
-        lost.anchor.setTo( 0.5, 0.5);
-    }
-    
-    //if player loses
-    function defeat()
-    {
-        player.kill();
-        isAlive = false;
-        timerActive = false;
-        lost = game.add.text(game.world.centerX, game.world.centerY, "You didn't make it...", style);
+        lost = game.add.text(game.world.centerX, game.world.centerY, "Time up!\nScore: " + score, style);
         lost.anchor.setTo( 0.5, 0.5);
     }
     
     function render() {
-        game.debug.text("Progress: " + parseInt(score/25000) + "%", 20, 570);
-        game.debug.text("Lives: " + lives, 20, 590);
+        game.debug.text("Score: " + score, 200, 595);
+        game.debug.text("Speed: " + parseInt(playerVelocity/10) + " mph", 20, 575);
+        game.debug.text("Gear: " + gearText, 20, 595);
     }
 };
